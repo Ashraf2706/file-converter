@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>File Converter</title>
+<meta name="description" content="Free, unlimited, private file converter. Everything runs in your browser — nothing is uploaded anywhere.">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-2: #1f2330;
+    --border: #2a2f3e;
+    --text: #e8eaf0;
+    --text-dim: #9aa1b5;
+    --accent: #7c9aff;
+    --accent-strong: #5b7fff;
+    --green: #4ade80;
+    --red: #f87171;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f9;
+      --surface: #ffffff;
+      --surface-2: #eef0f6;
+      --border: #d9dce6;
+      --text: #1a1d27;
+      --text-dim: #5d6478;
+      --accent: #3b5bdb;
+      --accent-strong: #2f4ec4;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header { text-align: center; margin: 24px 0 32px; }
+  header h1 { font-size: 1.9rem; letter-spacing: -0.02em; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--text-dim); margin-top: 8px; font-size: 0.95rem; }
+
+  .drop {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop.dragover { border-color: var(--accent); background: var(--surface-2); }
+  .drop .icon { font-size: 2.4rem; display: block; margin-bottom: 12px; }
+  .drop strong { color: var(--accent); }
+  .drop small { display: block; margin-top: 10px; color: var(--text-dim); }
+  #fileInput { display: none; }
+
+  .list { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .item .meta { flex: 1 1 200px; min-width: 0; }
+  .item .name {
+    font-weight: 600; font-size: 0.95rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .item .sub { color: var(--text-dim); font-size: 0.8rem; margin-top: 2px; }
+  .item select, .item button, .quality input {
+    font: inherit;
+  }
+  select {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--accent-strong);
+    color: #fff;
+    transition: filter .15s;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .btn.green { background: #15803d; }
+  .status { font-size: 0.8rem; min-width: 70px; text-align: right; }
+  .status.ok { color: var(--green); }
+  .status.err { color: var(--red); }
+
+  .toolbar { margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .quality {
+    display: none;
+    align-items: center; gap: 8px;
+    color: var(--text-dim); font-size: 0.85rem;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .quality.show { display: flex; }
+
+  footer { margin-top: 48px; text-align: center; color: var(--text-dim); font-size: 0.8rem; }
+  footer .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+  footer .badge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>File <span>Converter</span></h1>
+    <p>Unlimited conversions, no sign-up, no uploads — everything happens right in your browser.</p>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose files to convert">
+    <span class="icon">&#128193;</span>
+    <div><strong>Click to choose files</strong> or drag &amp; drop them here</div>
+    <small>Video (MOV, MP4, WebM, AVI, MKV) &middot; Audio (MP3, WAV, M4A, OGG, FLAC) &middot; Images (PNG, JPEG, WebP, GIF, BMP, SVG) &middot; Data (CSV, JSON, TSV) &middot; Text (TXT, MD)</small>
+  </div>
+  <input type="file" id="fileInput" multiple>
+
+  <div class="quality" id="qualityRow">
+    <label for="quality">JPEG / WebP quality</label>
+    <input type="range" id="quality" min="10" max="100" value="92">
+    <span id="qualityVal">92%</span>
+  </div>
+
+  <div class="list" id="list"></div>
+
+  <div class="toolbar">
+    <button class="btn green" id="convertAll" style="display:none">Convert all</button>
+    <button class="btn ghost" id="clearAll" style="display:none">Clear</button>
+  </div>
+
+  <footer>
+    <div class="badges">
+      <span class="badge">&#9889; Unlimited</span>
+      <span class="badge">&#128274; 100% private</span>
+      <span class="badge">&#128230; Batch convert</span>
+    </div>
+    <div>Your files never leave your device.</div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const IMG_TARGETS = ["png", "jpeg", "webp"];
+  const items = [];
+  const listEl = document.getElementById("list");
+  const drop = document.getElementById("drop");
+  const fileInput = document.getElementById("fileInput");
+  const convertAllBtn = document.getElementById("convertAll");
+  const clearAllBtn = document.getElementById("clearAll");
+  const qualityRow = document.getElementById("qualityRow");
+  const qualityInput = document.getElementById("quality");
+  const qualityVal = document.getElementById("qualityVal");
+
+  qualityInput.addEventListener("input", () => {
+    qualityVal.textContent = qualityInput.value + "%";
+  });
+
+  // ---------- file intake ----------
+  drop.addEventListener("click", () => fileInput.click());
+  drop.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+  });
+  fileInput.addEventListener("change", () => { addFiles(fileInput.files); fileInput.value = ""; });
+  ["dragover", "dragenter"].forEach(ev =>
+    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("dragover"); }));
+  ["dragleave", "drop"].forEach(ev =>
+    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("dragover"); }));
+  drop.addEventListener("drop", e => addFiles(e.dataTransfer.files));
+
+  function kindOf(file) {
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    if (["mov","mp4","m4v","webm","avi","mkv","3gp","wmv","flv","mpg","mpeg","mts","ts"].includes(ext) || file.type.startsWith("video/")) return "video";
+    if (["mp3","wav","m4a","aac","ogg","oga","flac","wma","opus","aiff","amr"].includes(ext) || file.type.startsWith("audio/")) return "audio";
+    if (file.type.startsWith("image/") || ["png","jpg","jpeg","webp","gif","bmp","svg","avif","ico"].includes(ext)) return "image";
+    if (["csv","tsv"].includes(ext)) return ext;
+    if (ext === "json" || file.type === "application/json") return "json";
+    if (["txt","md","markdown","log","html","htm"].includes(ext) || file.type.startsWith("text/")) return "text";
+    return null;
+  }
+
+  function targetsFor(kind) {
+    switch (kind) {
+      case "video": return ["mp4", "mp4 (re-encode)", "audio only (mp3)", "audio only (wav)"];
+      case "audio": return ["mp3", "wav", "m4a"];
+      case "image": return IMG_TARGETS;
+      case "csv":   return ["json", "tsv", "txt"];
+      case "tsv":   return ["json", "csv", "txt"];
+      case "json":  return ["csv", "json (pretty)", "json (minified)"];
+      case "text":  return ["txt", "md", "html"];
+      default:      return [];
+    }
+  }
+
+  function addFiles(fileList) {
+    for (const file of fileList) {
+      const kind = kindOf(file);
+      const item = { file, kind, status: "" };
+      items.push(item);
+      renderItem(item);
+    }
+    refreshToolbar();
+  }
+
+  function refreshToolbar() {
+    const any = items.length > 0;
+    convertAllBtn.style.display = any ? "" : "none";
+    clearAllBtn.style.display = any ? "" : "none";
+    qualityRow.classList.toggle("show", items.some(i => i.kind === "image"));
+  }
+
+  // ---------- UI ----------
+  function renderItem(item) {
+    const row = document.createElement("div");
+    row.className = "item";
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = item.file.name;
+    const sub = document.createElement("div");
+    sub.className = "sub";
+    sub.textContent = fmtSize(item.file.size) + (item.kind ? "" : " — unsupported type");
+    meta.append(name, sub);
+    row.append(meta);
+
+    const targets = targetsFor(item.kind);
+    if (targets.length) {
+      const sel = document.createElement("select");
+      for (const t of targets) {
+        const o = document.createElement("option");
+        o.value = t; o.textContent = "→ " + t.toUpperCase();
+        sel.append(o);
+      }
+      // default: don't convert to its own format
+      const ownExt = (item.file.name.split(".").pop() || "").toLowerCase().replace("jpg","jpeg");
+      if (targets[0] === ownExt && targets.length > 1) sel.selectedIndex = 1;
+      item.select = sel;
+      row.append(sel);
+
+      const btn = document.createElement("button");
+      btn.className = "btn";
+      btn.textContent = "Convert";
+      btn.addEventListener("click", () => convertItem(item));
+      item.button = btn;
+      row.append(btn);
+    }
+
+    const status = document.createElement("span");
+    status.className = "status";
+    item.statusEl = status;
+    row.append(status);
+
+    const remove = document.createElement("button");
+    remove.className = "btn ghost";
+    remove.textContent = "✕";
+    remove.title = "Remove";
+    remove.addEventListener("click", () => {
+      items.splice(items.indexOf(item), 1);
+      row.remove();
+      refreshToolbar();
+    });
+    row.append(remove);
+
+    item.row = row;
+    listEl.append(row);
+  }
+
+  convertAllBtn.addEventListener("click", async () => {
+    for (const item of items) {
+      if (item.select) await convertItem(item);
+    }
+  });
+  clearAllBtn.addEventListener("click", () => {
+    items.length = 0;
+    listEl.innerHTML = "";
+    refreshToolbar();
+  });
+
+  function setStatus(item, text, cls) {
+    item.statusEl.textContent = text;
+    item.statusEl.className = "status " + (cls || "");
+  }
+
+  // ---------- conversion ----------
+  async function convertItem(item) {
+    const target = item.select.value;
+    setStatus(item, "Working…");
+    item.button.disabled = true;
+    try {
+      let blob, outName;
+      const base = item.file.name.replace(/\.[^.]+$/, "");
+      if (item.kind === "video" || item.kind === "audio") {
+        [blob, outName] = await convertMedia(item, target, base);
+      } else if (item.kind === "image") {
+        blob = await convertImage(item.file, target);
+        outName = base + "." + (target === "jpeg" ? "jpg" : target);
+      } else {
+        const text = await item.file.text();
+        [blob, outName] = convertData(text, item.kind, target, base);
+      }
+      download(blob, outName);
+      setStatus(item, "Done ✓", "ok");
+    } catch (err) {
+      console.error(err);
+      setStatus(item, "Failed", "err");
+      alert("Couldn't convert " + item.file.name + ":\n" + err.message);
+    } finally {
+      item.button.disabled = false;
+    }
+  }
+
+  // ---------- video / audio via self-hosted ffmpeg.wasm ----------
+  let ffmpegPromise = null;
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("Failed to load " + src));
+      document.head.append(s);
+    });
+  }
+
+  function getFFmpeg(item) {
+    if (!ffmpegPromise) {
+      ffmpegPromise = (async () => {
+        setStatus(item, "Loading engine…");
+        await loadScript("vendor/ffmpeg/ffmpeg.js");
+        const ffmpeg = new FFmpegWASM.FFmpeg();
+        await ffmpeg.load({
+          coreURL: new URL("vendor/core/ffmpeg-core.js", location.href).href,
+          wasmURL: new URL("vendor/core/ffmpeg-core.wasm", location.href).href,
+        });
+        return ffmpeg;
+      })();
+      ffmpegPromise.catch(() => { ffmpegPromise = null; }); // allow retry after a failed load
+    }
+    return ffmpegPromise;
+  }
+
+  async function convertMedia(item, target, base) {
+    if (item.file.size > 900 * 1048576) {
+      throw new Error("Files over ~900 MB can exceed the browser's memory for video work. Try a smaller file.");
+    }
+    const ffmpeg = await getFFmpeg(item);
+    const inExt = (item.file.name.split(".").pop() || "bin").toLowerCase();
+    const inName = "input." + inExt;
+
+    const onProgress = ({ progress }) => {
+      if (progress > 0 && progress <= 1.05) {
+        setStatus(item, "Converting " + Math.min(100, Math.round(progress * 100)) + "%");
+      }
+    };
+    ffmpeg.on("progress", onProgress);
+
+    try {
+      setStatus(item, "Reading file…");
+      await ffmpeg.writeFile(inName, new Uint8Array(await item.file.arrayBuffer()));
+
+      let outName, outFile, args;
+      if (target === "mp4") {
+        // fast remux first (instant for iPhone/most camera files); falls back to re-encode
+        outFile = "output.mp4";
+        setStatus(item, "Converting…");
+        let ret = await ffmpeg.exec(["-i", inName, "-c", "copy", "-movflags", "+faststart", "-y", outFile]);
+        if (ret !== 0) {
+          setStatus(item, "Re-encoding…");
+          ret = await encodeMp4(ffmpeg, inName, outFile);
+        }
+        if (ret !== 0) throw new Error("FFmpeg could not convert this file.");
+        outName = base + ".mp4";
+      } else if (target === "mp4 (re-encode)") {
+        outFile = "output.mp4";
+        setStatus(item, "Re-encoding (this can take a while)…");
+        const ret = await encodeMp4(ffmpeg, inName, outFile);
+        if (ret !== 0) throw new Error("FFmpeg could not re-encode this file.");
+        outName = base + ".mp4";
+      } else if (target === "audio only (mp3)" || target === "mp3") {
+        outFile = "output.mp3";
+        args = ["-i", inName, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", "-y", outFile];
+        if (await ffmpeg.exec(args) !== 0) throw new Error("FFmpeg could not extract MP3 audio.");
+        outName = base + ".mp3";
+      } else if (target === "audio only (wav)" || target === "wav") {
+        outFile = "output.wav";
+        args = ["-i", inName, "-vn", "-c:a", "pcm_s16le", "-y", outFile];
+        if (await ffmpeg.exec(args) !== 0) throw new Error("FFmpeg could not extract WAV audio.");
+        outName = base + ".wav";
+      } else if (target === "m4a") {
+        outFile = "output.m4a";
+        args = ["-i", inName, "-vn", "-c:a", "aac", "-b:a", "192k", "-y", outFile];
+        if (await ffmpeg.exec(args) !== 0) throw new Error("FFmpeg could not convert to M4A.");
+        outName = base + ".m4a";
+      } else {
+        throw new Error("Unknown target: " + target);
+      }
+
+      const data = await ffmpeg.readFile(outFile);
+      if (!data || !data.byteLength) throw new Error("Conversion produced an empty file.");
+      const mime = outFile.endsWith(".mp4") ? "video/mp4"
+                 : outFile.endsWith(".mp3") ? "audio/mpeg"
+                 : outFile.endsWith(".wav") ? "audio/wav" : "audio/mp4";
+      const blob = new Blob([data], { type: mime });
+      try { await ffmpeg.deleteFile(inName); await ffmpeg.deleteFile(outFile); } catch (e) {}
+      return [blob, outName];
+    } finally {
+      ffmpeg.off("progress", onProgress);
+    }
+  }
+
+  function encodeMp4(ffmpeg, inName, outFile) {
+    return ffmpeg.exec([
+      "-i", inName,
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+      "-pix_fmt", "yuv420p",
+      "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", // x264 needs even dimensions
+      "-c:a", "aac", "-b:a", "160k",
+      "-movflags", "+faststart",
+      "-y", outFile,
+    ]);
+  }
+
+  async function convertImage(file, target) {
+    const mime = "image/" + target;
+    const bitmap = await loadImage(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (target === "jpeg") { // JPEG has no alpha — white background
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    const quality = Number(qualityInput.value) / 100;
+    const blob = await new Promise(res => canvas.toBlob(res, mime, quality));
+    if (!blob || blob.type !== mime) {
+      throw new Error("Your browser can't encode " + target.toUpperCase() + ". Try PNG or JPEG, or use Chrome/Edge/Firefox.");
+    }
+    return blob;
+  }
+
+  async function loadImage(file) {
+    if ("createImageBitmap" in window && !file.name.toLowerCase().endsWith(".svg")) {
+      try { return await createImageBitmap(file); } catch (e) { /* fall through */ }
+    }
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't decode this image.")); };
+      img.src = url;
+    });
+  }
+
+  function convertData(text, kind, target, base) {
+    if (kind === "csv" || kind === "tsv") {
+      const rows = parseDelimited(text, kind === "csv" ? "," : "\t");
+      if (target === "json") {
+        return [textBlob(JSON.stringify(rowsToObjects(rows), null, 2), "application/json"), base + ".json"];
+      }
+      if (target === "csv" || target === "tsv") {
+        const d = target === "csv" ? "," : "\t";
+        return [textBlob(rows.map(r => r.map(c => escapeField(c, d)).join(d)).join("\n"), "text/plain"), base + "." + target];
+      }
+      return [textBlob(text, "text/plain"), base + ".txt"];
+    }
+    if (kind === "json") {
+      const data = JSON.parse(text);
+      if (target === "csv") {
+        return [textBlob(jsonToCsv(data), "text/csv"), base + ".csv"];
+      }
+      if (target === "json (minified)") {
+        return [textBlob(JSON.stringify(data), "application/json"), base + ".min.json"];
+      }
+      return [textBlob(JSON.stringify(data, null, 2), "application/json"), base + ".json"];
+    }
+    // plain text family — re-label the extension
+    const ext = target === "html" ? "html" : target;
+    const mime = target === "html" ? "text/html" : "text/plain";
+    return [textBlob(text, mime), base + "." + ext];
+  }
+
+  // minimal RFC-4180-ish parser (handles quoted fields, embedded delimiters, newlines)
+  function parseDelimited(text, delim) {
+    const rows = [[]];
+    let field = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else if (c === '"') {
+        inQuotes = true;
+      } else if (c === delim) {
+        rows[rows.length - 1].push(field); field = "";
+      } else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        rows[rows.length - 1].push(field); field = "";
+        rows.push([]);
+      } else field += c;
+    }
+    rows[rows.length - 1].push(field);
+    // drop trailing empty row
+    if (rows.length > 1 && rows[rows.length - 1].every(f => f === "")) rows.pop();
+    return rows;
+  }
+
+  function rowsToObjects(rows) {
+    if (rows.length < 2) return rows;
+    const [header, ...rest] = rows;
+    return rest.map(r => Object.fromEntries(header.map((h, i) => [h, r[i] ?? ""])));
+  }
+
+  function jsonToCsv(data) {
+    const arr = Array.isArray(data) ? data : [data];
+    if (!arr.length) return "";
+    if (typeof arr[0] !== "object" || arr[0] === null) {
+      return arr.map(v => escapeField(String(v), ",")).join("\n");
+    }
+    const keys = [...new Set(arr.flatMap(o => Object.keys(o)))];
+    const lines = [keys.map(k => escapeField(k, ",")).join(",")];
+    for (const o of arr) {
+      lines.push(keys.map(k => {
+        let v = o[k];
+        if (v === undefined || v === null) v = "";
+        else if (typeof v === "object") v = JSON.stringify(v);
+        return escapeField(String(v), ",");
+      }).join(","));
+    }
+    return lines.join("\n");
+  }
+
+  function escapeField(v, delim) {
+    return (v.includes('"') || v.includes(delim) || v.includes("\n"))
+      ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+
+  function textBlob(s, mime) { return new Blob([s], { type: mime + ";charset=utf-8" }); }
+
+  function download(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / 1048576).toFixed(1) + " MB";
+  }
+})();
+</script>
+</body>
+</html>
